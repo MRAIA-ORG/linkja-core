@@ -5,7 +5,7 @@ This project contains classes shared across the linkja applications. Additional 
 ## Building
 linkja-core needs Java 25 (e.g. [Eclipse Temurin](https://adoptium.net/)) and [Maven](https://maven.apache.org/).
 
-The tests call the linkja C library, so compile it first from the `develop` branch of [linkja-crypto](https://github.com/MRAIA-ORG/linkja-crypto). The public build is enough, because linkja-core uses only functions that it holds (key generation and RSA). From a linkja-crypto clone beside this one:
+The tests call the linkja C library, so compile it first from the `develop` branch of [linkja-crypto](https://github.com/MRAIA-ORG/linkja-crypto). The public build is enough, because linkja-core uses only functions that it holds (key generation and RSA). It needs OpenSSL 3, CMake and cmocka (e.g. `brew install openssl@3 cmake cmocka`). From a linkja-crypto clone beside this one:
 
 ```
 mvn install -DskipTests
