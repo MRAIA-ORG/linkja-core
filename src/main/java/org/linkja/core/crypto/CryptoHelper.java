@@ -29,7 +29,7 @@ public class CryptoHelper {
   private static final int IV_SIZE = 64;
   private static final int TAG_BIT_LENGTH = 128;
   private static final String AES_KEY_ALGORITHM = "AES";
-  private static final String AES_ENCRYPTION_ALGORITHM = "AES/GCM/PKCS5Padding";
+  private static final String AES_ENCRYPTION_ALGORITHM = "AES/GCM/NoPadding";
   private static final String RSA_ENCRYPTION_ALGORITHM = "RSA/ECB/PKCS1Padding";
   private static final int CIPHER_OUTPUT_BUFFER_SIZE = 8192;
 
