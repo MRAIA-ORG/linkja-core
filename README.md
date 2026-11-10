@@ -3,15 +3,27 @@
 This project contains classes shared across the linkja applications. Additional documentation is also provided regarding implementations regarding  [encryption](#encryption), and [exception handling](#exception-handling).
 
 ## Building
-linkja-core was built using Java JDK 10 (specifically [OpenJDK](https://openjdk.java.net/)).  It can be opened from within an IDE like Eclipse or IntelliJ IDEA and compiled, or compiled from the command line using [Maven](https://maven.apache.org/).
+linkja-core needs Java 25 (e.g. [Eclipse Temurin](https://adoptium.net/)) and [Maven](https://maven.apache.org/).
 
-`mvn clean package`
+The tests call the linkja C library, so compile it first from the `develop` branch of [linkja-crypto](https://github.com/MRAIA-ORG/linkja-crypto). The no-secrets build is enough, because linkja-core uses only its RSA functions. From a linkja-crypto clone beside this one:
 
-This will compile the code, run all unit tests, and create a distributable JAR file under the .\target folder.  The JAR will be named something like `linkja-core-1.0.jar`.
+```
+mvn install -DskipTests
+cmake . -DINCLUDE_SECRETS=OFF -DCMAKE_BUILD_TYPE=Release
+make linkjacrypto
+```
+
+Then, from this folder:
+
+`mvn clean package -Dnative.lib.dir=../linkja-crypto/target`
+
+This compiles the code, runs all unit tests, and puts the JAR in the `target` folder, e.g. `target/linkja-core-1.1.0.jar`. If you do not give `native.lib.dir`, the tests look for the library in the `lib` folder.
+
+CI runs the same steps on each pull request. See `.github/workflows/ci.yml`.
 
 
 ## Deploying to Maven Repository
-Linkja uses the [linkja-mvn-repo](https://github.com/linkja/linkja-mvn-repo) GitHub repository as its Maven repository for project builds.
+Linkja uses the [linkja-mvn-repo](https://github.com/MRAIA-ORG/linkja-mvn-repo) GitHub repository as its Maven repository for project builds.
 
 The associated linkja projects that use linka-core will contain a reference to the GitHub repository in their pom.xml file.  Updates will need to be made to the linkja-mvn-repo and pushed to the master branch before projects will pick them up.
 
@@ -36,7 +48,7 @@ If you are updating an existing version of linkja-core and not bumping the versi
 
 ## Implementation Details
 ### Encryption
-There are two types of encryption being handled within linkja.  This includes asymmetric encryption using RSA, and symmetric encryption using AES.  Each of the following implementations are described in more detail, and is centrally implemented within the [CryptoHelper](src/main/java/org/linkja/core/CryptoHelper.java) class
+There are two types of encryption being handled within linkja.  This includes asymmetric encryption using RSA, and symmetric encryption using AES.  Each of the following implementations are described in more detail, and is centrally implemented within the [CryptoHelper](src/main/java/org/linkja/core/crypto/CryptoHelper.java) class
 
 #### Asymmetric Encryption
 Asymmetric encryption is built using RSA public and private key pairs.  It assumes a minimum of a 1024-bit RSA key.  RSA is used to manage the encryption of salt files used by sites for individual projects, as well as for encrypting generated AES keys (described under [Symmetric Encryption](#symmetric-encryption)).
@@ -44,7 +56,7 @@ Asymmetric encryption is built using RSA public and private key pairs.  It assum
 Because of how different systems can generate public and private keys, we are using the [Bouncy Castle](http://www.bouncycastle.org/) library to read in the public and private keys. Specifically we are specifying `RSA/ECB/PKCS1Padding` as our algorithm implementation.
 
 #### Symmetric Encryption
-Symmetric encryption is performed using AES-GCM-256 (algorithm reference including padding is `AES/GCM/PKCS5Padding`).  In addition to general `encryptAES` and `decryptAES` methods, there are additional methods to help linkja generate an AES key.
+Symmetric encryption is performed using AES-GCM-256 (algorithm reference is `AES/GCM/NoPadding`).  In addition to general `encryptAES` and `decryptAES` methods, there are additional methods to help linkja generate an AES key.
 
 AES key generation is done as part of a [hybrid crypto](https://en.wikipedia.org/wiki/Hybrid_cryptosystem) approach.  A symmetric key is randomly generated, and then signed using a public key.  The exact approach to implement this is as follows:
 
