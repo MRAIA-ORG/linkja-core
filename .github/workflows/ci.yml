@@ -34,8 +34,8 @@ jobs:
         working-directory: linkja-crypto
         run: mvn -B install -DskipTests
 
-      # linkja-core calls only the RSA functions, so the no-secrets build is enough.
-      - name: Compile the C library without secrets
+      # linkja-core calls only key generation and RSA, so the public build is enough.
+      - name: Compile the public build of the C library
         working-directory: linkja-crypto
         run: |
           cmake . -DINCLUDE_SECRETS=OFF -DCMAKE_BUILD_TYPE=Release

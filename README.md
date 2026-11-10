@@ -5,7 +5,7 @@ This project contains classes shared across the linkja applications. Additional 
 ## Building
 linkja-core needs Java 25 (e.g. [Eclipse Temurin](https://adoptium.net/)) and [Maven](https://maven.apache.org/).
 
-The tests call the linkja C library, so compile it first from the `develop` branch of [linkja-crypto](https://github.com/MRAIA-ORG/linkja-crypto). The no-secrets build is enough, because linkja-core uses only its RSA functions. From a linkja-crypto clone beside this one:
+The tests call the linkja C library, so compile it first from the `develop` branch of [linkja-crypto](https://github.com/MRAIA-ORG/linkja-crypto). The public build is enough, because linkja-core uses only functions that it holds (key generation and RSA). From a linkja-crypto clone beside this one:
 
 ```
 mvn install -DskipTests
@@ -51,7 +51,7 @@ If you are updating an existing version of linkja-core and not bumping the versi
 There are two types of encryption being handled within linkja.  This includes asymmetric encryption using RSA, and symmetric encryption using AES.  Each of the following implementations are described in more detail, and is centrally implemented within the [CryptoHelper](src/main/java/org/linkja/core/crypto/CryptoHelper.java) class
 
 #### Asymmetric Encryption
-Asymmetric encryption is built using RSA public and private key pairs.  It assumes a minimum of a 1024-bit RSA key.  RSA is used to manage the encryption of salt files used by sites for individual projects, as well as for encrypting generated AES keys (described under [Symmetric Encryption](#symmetric-encryption)).
+Asymmetric encryption is built using RSA public and private key pairs.  The Java methods in `CryptoHelper` assume a minimum of a 1024-bit RSA key. The hash file envelope in `EncryptedHashFileMetadata` uses the C library, which accepts only 2048-bit keys.  RSA is used to manage the encryption of salt files used by sites for individual projects, as well as for encrypting generated AES keys (described under [Symmetric Encryption](#symmetric-encryption)).
 
 Because of how different systems can generate public and private keys, we are using the [Bouncy Castle](http://www.bouncycastle.org/) library to read in the public and private keys. Specifically we are specifying `RSA/ECB/PKCS1Padding` as our algorithm implementation.
 

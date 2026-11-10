@@ -94,7 +94,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.6.1</version>
                 <configuration>
-                    <argLine>-Djava.library.path=${native.lib.dir} --enable-native-access=ALL-UNNAMED</argLine>
+                    <argLine>"-Djava.library.path=${native.lib.dir}" --enable-native-access=ALL-UNNAMED</argLine>
                 </configuration>
             </plugin>
             <plugin>
