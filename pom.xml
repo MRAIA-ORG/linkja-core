@@ -27,9 +27,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/linkja/linkja-core.git</connection>
-        <developerConnection>scm:git:ssh://github.com:linkja/linkja-core.git</developerConnection>
-        <url>http://github.com/linkja/linkja-core/tree/master</url>
+        <connection>scm:git:https://github.com/MRAIA-ORG/linkja-core.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/MRAIA-ORG/linkja-core.git</developerConnection>
+        <url>https://github.com/MRAIA-ORG/linkja-core/tree/develop</url>
     </scm>
 
     <properties>
