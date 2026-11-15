@@ -17,7 +17,7 @@ Then, from this folder:
 
 `mvn clean package -Dnative.lib.dir=../linkja-crypto/target`
 
-This compiles the code, runs all unit tests, and puts the JAR in the `target` folder, e.g. `target/linkja-core-1.1.0.jar`. If you do not give `native.lib.dir`, the tests look for the library in the `lib` folder.
+This compiles the code, runs all unit tests, and puts the JAR in the `target` folder, e.g. `target/linkja-core-2.0.0-SNAPSHOT.jar`. If you do not give `native.lib.dir`, the tests look for the library in the `lib` folder.
 
 CI runs the same steps on each pull request. See `.github/workflows/ci.yml`.
 
