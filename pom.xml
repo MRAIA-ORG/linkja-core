@@ -10,7 +10,7 @@
 
     <name>${project.groupId}:${project.artifactId}</name>
     <description>Shared Java library across linkja projects.</description>
-    <url>https://linkja.github.io/</url>
+    <url>https://github.com/MRAIA-ORG/linkja-core</url>
 
     <licenses>
         <license>
