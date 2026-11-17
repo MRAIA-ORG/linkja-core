@@ -18,6 +18,8 @@ import java.nio.file.StandardOpenOption;
  *
  * The constructor makes a new file (it fails if the file is there), a random session key, and writes the header with a
  * row count of 0 and the envelope. writeRow writes the secure hash of each of the 11 plain hash values of one row.
+ * An empty or null PIDHASH stops writeRow with an error, because a v1 file never has a row without one. Any other
+ * empty or null value is written as 64 zero bytes, the same as linkja-hashing 1.1.1.
  * close writes the final row count into the header. A caller whose run fails removes the file itself.
  */
 public class HashFileWriter implements Closeable {
@@ -45,13 +47,18 @@ public class HashFileWriter implements Closeable {
   }
 
   /**
-   * Writes one row. plainHashValues holds one plain hash value per hash rule, in HashRule order. A null or empty value
-   * is written as an empty hash value.
+   * Writes one row. plainHashValues holds one plain hash value per hash rule, in HashRule order. A null or empty
+   * PIDHASH throws IllegalArgumentException, and nothing is written for that row. Any other null or empty value is
+   * written as 64 zero bytes.
    */
   public void writeRow(String[] plainHashValues) throws IOException {
     if (plainHashValues.length != HashRule.values().length) {
       throw new IllegalArgumentException(String.format("A row needs %d hash values, but has %d",
         HashRule.values().length, plainHashValues.length));
+    }
+    String pidhash = plainHashValues[HashRule.PIDHASH.ordinal()];
+    if (pidhash == null || pidhash.isEmpty()) {
+      throw new IllegalArgumentException("A row needs a PIDHASH value, but it is empty");
     }
     numRows++;
     String rowId = Long.toString(numRows);

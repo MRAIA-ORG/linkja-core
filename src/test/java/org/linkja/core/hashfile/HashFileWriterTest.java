@@ -2,6 +2,8 @@ package org.linkja.core.hashfile;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.linkja.core.crypto.FakeCrypto;
 import org.linkja.crypto.RsaResult;
 
@@ -97,5 +99,50 @@ class HashFileWriterTest {
       new ReferenceCrypto())) {
       assertThrows(IllegalArgumentException.class, () -> writer.writeRow(new String[10]));
     }
+  }
+
+  /** Writes the given rows to a new file in folder and gives the file length. */
+  private static long writtenLength(Path folder, String name, String[]... rows) throws Exception {
+    Path output = folder.resolve(name);
+    try (HashFileWriter writer = new HashFileWriter(output, SITE_ID, PROJECT_ID, resource("public-test.key").toFile(),
+      new ReferenceCrypto())) {
+      for (String[] row : rows) {
+        writer.writeRow(row);
+      }
+    }
+    return Files.size(output);
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  void writeRow_rejectsAnEmptyPidhashAndWritesNothingForThatRow(String pidhash, @TempDir Path folder)
+    throws Exception {
+    String[] row = new String[HashRule.values().length];
+    Arrays.fill(row, "A");
+    row[HashRule.PIDHASH.ordinal()] = pidhash;
+    Path output = folder.resolve("hashes.enc");
+    try (HashFileWriter writer = new HashFileWriter(output, SITE_ID, PROJECT_ID, resource("public-test.key").toFile(),
+      new ReferenceCrypto())) {
+      IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> writer.writeRow(row));
+      assertTrue(error.getMessage().contains("PIDHASH"), error.getMessage());
+    }
+    assertEquals(writtenLength(folder, "no-rows.enc"), Files.size(output));
+  }
+
+  @Test
+  void writeRow_writesANullValueThatIsNotPidhashAs64ZeroBytes(@TempDir Path folder) throws Exception {
+    String[] row = new String[HashRule.values().length];
+    row[HashRule.PIDHASH.ordinal()] = "A";
+    Path output = folder.resolve("hashes.enc");
+    try (HashFileWriter writer = new HashFileWriter(output, SITE_ID, PROJECT_ID, resource("public-test.key").toFile(),
+      new ReferenceCrypto())) {
+      writer.writeRow(row);
+    }
+    byte[] bytes = Files.readAllBytes(output);
+    int rowStart = (int) writtenLength(folder, "no-rows.enc");
+    int hashLength = 64;
+    assertEquals(rowStart + HashRule.values().length * hashLength, bytes.length);
+    byte[] afterPidhash = Arrays.copyOfRange(bytes, rowStart + hashLength, bytes.length);
+    assertArrayEquals(new byte[afterPidhash.length], afterPidhash);
   }
 }
