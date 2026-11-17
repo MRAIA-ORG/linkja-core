@@ -7,6 +7,9 @@ import org.linkja.crypto.RsaResult;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.Arrays;
+import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -81,15 +84,36 @@ class FakeCryptoTest {
     assertEquals(unlockedByReal.length, unlockedByFake.length);
   }
 
-  // Random output: the two agree on length and format only.
+  // Random output: the two agree on length and format only. Two lengths show the length is used. Two calls that
+  // differ show the output is not a constant.
   @Test
   void randomValues_agreeOnLengthAndFormat() {
-    assertEquals(real.generateKey(32).length, fake.generateKey(32).length);
-    assertEquals(real.generateIV(16).length, fake.generateIV(16).length);
-    String realToken = real.generateToken(16);
-    String fakeToken = fake.generateToken(16);
-    assertEquals(realToken.length(), fakeToken.length());
-    assertTrue(realToken.matches("[0-9a-f]{32}"), realToken);
-    assertTrue(fakeToken.matches("[0-9a-f]{32}"), fakeToken);
+    for (Crypto crypto : new Crypto[] { real, fake }) {
+      String name = crypto.getClass().getSimpleName();
+      for (int length : new int[] { 16, 32 }) {
+        assertEquals(length, crypto.generateKey(length).length, name);
+        assertEquals(length, crypto.generateIV(length).length, name);
+        String token = crypto.generateToken(length);
+        assertTrue(token.matches("[0-9a-f]{" + 2 * length + "}"), name + ": " + token);
+      }
+      assertFalse(Arrays.equals(crypto.generateKey(16), crypto.generateKey(16)), name);
+      assertFalse(Arrays.equals(crypto.generateIV(16), crypto.generateIV(16)), name);
+      assertNotEquals(crypto.generateToken(16), crypto.generateToken(16), name);
+    }
+  }
+
+  // The fake's secure hash, reverted, must be the hex of sha256(FAKE_SECRET + input), as in the C library with its
+  // own secret. Row ID and token ID differ, so a swap of the two is caught.
+  @Test
+  void fakeSecureHash_revertGivesSecretHashOfInput() throws Exception {
+    byte[] sessionKey = "0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
+    String input = fake.hash("test");
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    digest.update(FakeCrypto.FAKE_SECRET);
+    String expected = HexFormat.of().formatHex(digest.digest(input.getBytes(StandardCharsets.UTF_8)));
+
+    String secureHash = fake.createSecureHash(input, sessionKey, "1001", "PIDHASH");
+    assertNotEquals(expected, secureHash);
+    assertEquals(expected, fake.revertSecureHash(secureHash, sessionKey, "1001", "PIDHASH"));
   }
 }
