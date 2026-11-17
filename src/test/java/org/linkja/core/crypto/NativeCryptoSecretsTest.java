@@ -2,6 +2,7 @@ package org.linkja.core.crypto;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.linkja.crypto.Library;
 
 import java.nio.charset.StandardCharsets;
 
@@ -13,7 +14,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * createSecureHash. The public build throws UnsupportedOperationException, and then these tests are skipped.
  *
  * The test cannot know the secret, so it checks that the revert of a secure hash does not depend on the session
- * key, row ID or token ID that made it.
+ * key, row ID or token ID that made it, and that it does depend on the input.
+ *
+ * The probe calls the C library directly, so a fault in NativeCrypto that throws UnsupportedOperationException fails
+ * the test instead of skipping it.
  */
 class NativeCryptoSecretsTest {
   private static final Crypto real = new NativeCrypto();
@@ -22,12 +26,17 @@ class NativeCryptoSecretsTest {
   static void needsSecretsBuild() {
     boolean secretsBuild = true;
     try {
-      real.createSecureHash("probe", new byte[] { 1 }, "1", "T");
+      Library.createSecureHash("probe", new byte[] { 1 }, "1", "T");
     } catch (UnsupportedOperationException e) {
       secretsBuild = false;
     }
-    assumeTrue(secretsBuild, "Skipped: the linkja-crypto library is a public build without secrets, so "
-      + "createSecureHash throws. Build it with INCLUDE_SECRETS=ON to run this test.");
+    String reason = "Skipped: the linkja-crypto library is a public build without secrets, so createSecureHash "
+      + "throws. Build it with INCLUDE_SECRETS=ON to run this test.";
+    // Maven's console shows only the skip count, so print the reason too.
+    if (!secretsBuild) {
+      System.out.println(reason);
+    }
+    assumeTrue(secretsBuild, reason);
   }
 
   @Test
@@ -45,5 +54,10 @@ class NativeCryptoSecretsTest {
     assertEquals(64, revertedA.length());
     assertEquals(revertedA, revertedB);
     assertNotEquals(input, revertedA);
+
+    String otherInput = real.hash("other");
+    String revertedOther = real.revertSecureHash(real.createSecureHash(otherInput, keyA, "1001", "PIDHASH"), keyA,
+      "1001", "PIDHASH");
+    assertNotEquals(revertedA, revertedOther);
   }
 }
