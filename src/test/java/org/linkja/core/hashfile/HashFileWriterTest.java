@@ -115,18 +115,22 @@ class HashFileWriterTest {
 
   @ParameterizedTest
   @NullAndEmptySource
-  void writeRow_rejectsAnEmptyPidhashAndWritesNothingForThatRow(String pidhash, @TempDir Path folder)
+  void writeRow_rejectsAnEmptyPidhashWritesNothingForThatRowAndLetsTheCallerContinue(String pidhash, @TempDir Path folder)
     throws Exception {
     String[] row = new String[HashRule.values().length];
     Arrays.fill(row, "A");
     row[HashRule.PIDHASH.ordinal()] = pidhash;
+    String[] validRow = new String[HashRule.values().length];
+    Arrays.fill(validRow, "B");
     Path output = folder.resolve("hashes.enc");
     try (HashFileWriter writer = new HashFileWriter(output, SITE_ID, PROJECT_ID, resource("public-test.key").toFile(),
       new ReferenceCrypto())) {
       IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> writer.writeRow(row));
       assertTrue(error.getMessage().contains("PIDHASH"), error.getMessage());
+      writer.writeRow(validRow);
     }
-    assertEquals(writtenLength(folder, "no-rows.enc"), Files.size(output));
+    writtenLength(folder, "valid-row-only.enc", validRow);
+    assertArrayEquals(Files.readAllBytes(folder.resolve("valid-row-only.enc")), Files.readAllBytes(output));
   }
 
   @Test
