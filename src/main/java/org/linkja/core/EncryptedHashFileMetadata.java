@@ -1,6 +1,8 @@
 package org.linkja.core;
 
 import org.linkja.core.crypto.AesEncryptParameters;
+import org.linkja.core.crypto.Crypto;
+import org.linkja.core.crypto.NativeCrypto;
 import org.linkja.crypto.Library;
 import org.linkja.crypto.RsaResult;
 
@@ -46,6 +48,11 @@ public class EncryptedHashFileMetadata {
   }
 
   public void write(BufferedOutputStream stream, File rsaPublicKey) throws IOException, LinkjaException {
+    write(stream, rsaPublicKey, new NativeCrypto());
+  }
+
+  /** Writes the header and envelope. The envelope is locked with crypto.rsaEncrypt. */
+  public void write(BufferedOutputStream stream, File rsaPublicKey, Crypto crypto) throws IOException, LinkjaException {
     stream.write(METADATA_START_BLOCK);
     stream.write(BLOCK_DELIMITER);
 
@@ -88,10 +95,10 @@ public class EncryptedHashFileMetadata {
     stream.write(BLOCK_DELIMITER);
 
     byte[] keyBytes = Files.readAllBytes(rsaPublicKey.toPath());
-    RsaResult result = Library.rsaEncrypt(sessionKey, keyBytes);
+    RsaResult result = crypto.rsaEncrypt(sessionKey, keyBytes);
     FileHelper.writeInt(stream, result.data.length);
     stream.write(result.data);
-    result = Library.rsaEncrypt(cryptoSignature.getBytes(), keyBytes);
+    result = crypto.rsaEncrypt(cryptoSignature.getBytes(), keyBytes);
     FileHelper.writeInt(stream, result.data.length);
     stream.write(result.data);
     stream.write(ENVELOPE_END_BLOCK);

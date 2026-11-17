@@ -1,0 +1,55 @@
+diff --git a/src/linkja-crypto.c b/src/linkja-crypto.c
+index 0169cff..566c205 100644
+--- a/src/linkja-crypto.c
++++ b/src/linkja-crypto.c
+@@ -2,6 +2,7 @@
+ #include <ctype.h>
+ #include <stdio.h>
+ #include <string.h>
++#include <stdlib.h>
+ 
+ #include "linkja-crypto.h"
+ #include "include/org_linkja_crypto_Library.h"
+@@ -737,6 +738,7 @@ JNIEXPORT jbyteArray JNICALL Java_org_linkja_crypto_Library_generateKey
+     return NULL;
+   }
+   generate_key(length, output);
++  for (int i = 0; i < length; i++) { output[i] = (unsigned char)i; }  /* REFERENCE: fixed key */
+   jbyteArray key = (*env)->NewByteArray(env, length);
+   (*env)->SetByteArrayRegion(env, key, 0, length, (jbyte*)output);
+   free(output);
+@@ -810,6 +812,18 @@ JNIEXPORT jstring JNICALL Java_org_linkja_crypto_Library_createSecureHash
+     final_hash[index] = input_hash[index] ^ supplemental_hash[index];
+   }
+ 
++  { /* REFERENCE: log row ID, token ID and plain hash value */
++    FILE *log = fopen(getenv("LINKJA_REFERENCE_LOG"), "a");
++    const char *r = (*env)->GetStringUTFChars(env, rowId, 0);
++    const char *t = (*env)->GetStringUTFChars(env, tokenId, 0);
++    const char *i = (*env)->GetStringUTFChars(env, input, 0);
++    fprintf(log, "%s,%s,%s\n", r, t, i);
++    fclose(log);
++    (*env)->ReleaseStringUTFChars(env, rowId, r);
++    (*env)->ReleaseStringUTFChars(env, tokenId, t);
++    (*env)->ReleaseStringUTFChars(env, input, i);
++  }
++
+   char output[HASH_STRING_OUTPUT_BUFFER_LEN + 1];
+   bytes_to_hex_string(final_hash, HASH_OUTPUT_BUFFER_LEN, output, HASH_STRING_OUTPUT_BUFFER_LEN);
+   return (*env)->NewStringUTF(env, output);
+@@ -1004,9 +1018,12 @@ jobject rsaEncryptDecrypt
+     int output_array_len = 0;  // Actual length
+     bool result = false;
+     if (encrypt) {
+-        result =  rsa_encrypt((unsigned char *)data_array, data_array_len,
+-                            (unsigned char *)key_array, key_array_len,
+-                            output_array, &output_array_len);
++        /* REFERENCE: predictable lock, LOCKED( + data + ) */
++        memcpy(output_array, "LOCKED(", 7);
++        memcpy(output_array + 7, data_array, data_array_len);
++        output_array[7 + data_array_len] = ')';
++        output_array_len = 7 + data_array_len + 1;
++        result = true;
+     }
+     else {
+         result =  rsa_decrypt((unsigned char *)data_array, data_array_len,
