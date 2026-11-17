@@ -32,7 +32,8 @@ import java.util.HexFormat;
  * - It does not copy the C library length checks (e.g. AES key must be 32 bytes, RSA key must be 2048 bits).
  */
 public class FakeCrypto implements Crypto {
-  private static final byte[] FAKE_SECRET = "linkja-core FakeCrypto test secret".getBytes(StandardCharsets.US_ASCII);
+  // Package-private so FakeCryptoTest can check createSecureHash.
+  static final byte[] FAKE_SECRET = "linkja-core FakeCrypto test secret".getBytes(StandardCharsets.US_ASCII);
   private static final String SIGNATURE = "(FakeCrypto)";
   private static final String AES_ALGORITHM = "AES/GCM/NoPadding";
   private static final int AES_TAG_BITS = 128;
