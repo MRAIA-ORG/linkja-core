@@ -34,7 +34,7 @@ jobs:
         working-directory: linkja-crypto
         run: mvn -B install -DskipTests
 
-      # linkja-core calls only key generation and RSA, so the public build is enough.
+      # The tests never call createSecureHash, the one function that needs the secret, so the public build is enough.
       - name: Compile the public build of the C library
         working-directory: linkja-crypto
         run: |
