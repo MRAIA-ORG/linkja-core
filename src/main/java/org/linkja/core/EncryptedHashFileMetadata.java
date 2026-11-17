@@ -3,11 +3,11 @@ package org.linkja.core;
 import org.linkja.core.crypto.AesEncryptParameters;
 import org.linkja.core.crypto.Crypto;
 import org.linkja.core.crypto.NativeCrypto;
-import org.linkja.crypto.Library;
 import org.linkja.crypto.RsaResult;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.util.Arrays;
 
 public class EncryptedHashFileMetadata {
   private static final int METADATA_VERSION = 1;
@@ -125,6 +125,11 @@ public class EncryptedHashFileMetadata {
   }
 
   public static EncryptedHashFileMetadata read(BufferedInputStream stream, File rsaPrivateKey) throws IOException, LinkjaException {
+    return read(stream, rsaPrivateKey, new NativeCrypto());
+  }
+
+  /** Reads the header and envelope. The envelope is unlocked with crypto.rsaDecrypt. */
+  public static EncryptedHashFileMetadata read(BufferedInputStream stream, File rsaPrivateKey, Crypto crypto) throws IOException, LinkjaException {
     EncryptedHashFileMetadata metadata = new EncryptedHashFileMetadata();
     readBlockNameFromStream(stream, "metadata start", METADATA_START_BLOCK);
 
@@ -177,8 +182,8 @@ public class EncryptedHashFileMetadata {
     readBlockNameFromStream(stream, "envelope start", ENVELOPE_START_BLOCK);
 
     byte[] rsaPrivateKeyBytes = Files.readAllBytes(rsaPrivateKey.toPath());
-    byte[] sessionKey = readAndDecryptFromStream(stream, rsaPrivateKeyBytes, "session key", sessionKeySize);
-    String cryptoSignature = new String(readAndDecryptFromStream(stream, rsaPrivateKeyBytes, "crypto signature", cryptoSignatureSize));
+    byte[] sessionKey = readAndDecryptFromStream(stream, rsaPrivateKeyBytes, "session key", sessionKeySize, crypto);
+    String cryptoSignature = new String(readAndDecryptFromStream(stream, rsaPrivateKeyBytes, "crypto signature", cryptoSignatureSize, crypto));
 
     metadata.setSessionKey(sessionKey);
     metadata.setCryptoSignature(cryptoSignature);
@@ -191,16 +196,16 @@ public class EncryptedHashFileMetadata {
   private static void readBlockNameFromStream(BufferedInputStream stream, String blockName, byte[] blockValue) throws IOException, LinkjaException {
     byte[] buffer = new byte[blockValue.length];
     int result = stream.read(buffer, 0, blockValue.length);
-    if (result != blockValue.length) {
+    if (result != blockValue.length || !Arrays.equals(buffer, blockValue)) {
       throw new LinkjaException(String.format("Invalid %s block in header", blockName));
     }
 
     readBlockDelimiter(stream, String.format("%s block in header", blockName));
   }
 
-  private static byte[] readAndDecryptFromStream(BufferedInputStream stream, byte[] rsaPrivateKey, String dataElementName, int expectedLength) throws LinkjaException, IOException {
+  private static byte[] readAndDecryptFromStream(BufferedInputStream stream, byte[] rsaPrivateKey, String dataElementName, int expectedLength, Crypto crypto) throws LinkjaException, IOException {
     byte[] data = readByteArrayFromStream(stream, dataElementName);
-    RsaResult decryptResult = Library.rsaDecrypt(data, rsaPrivateKey);
+    RsaResult decryptResult = crypto.rsaDecrypt(data, rsaPrivateKey);
     if (decryptResult.length != expectedLength) {
       throw new LinkjaException(String.format("The %s was corrupted and could not be read from the header", dataElementName));
     }
