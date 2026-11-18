@@ -78,7 +78,7 @@ public class HashFileWriter implements Closeable {
     }
   }
 
-  /** Closes stream after failure, the error that stops a constructor. An error from close is added to failure. */
+  /** Closes stream after a constructor fails. An error from close is added to failure as a suppressed error. */
   static void closeAfterFailure(Closeable stream, Throwable failure) {
     try {
       stream.close();

@@ -154,6 +154,20 @@ class HashFileReaderTest {
     assertEquals(openFiles, openFileCount());
   }
 
+  @Test
+  void constructor_closesTheFileWhenTheCryptoThrowsAnError(@TempDir Path folder) throws Exception {
+    Path file = writeHashFile(folder, "hashes.enc", row("A"));
+    Crypto failingCrypto = new ReferenceCrypto() {
+      @Override
+      public RsaResult rsaDecrypt(byte[] data, byte[] key) {
+        throw new UnsatisfiedLinkError("rsaDecrypt failed");
+      }
+    };
+    long openFiles = openFileCount();
+    assertThrows(UnsatisfiedLinkError.class, () -> new HashFileReader(file, privateKey(), failingCrypto));
+    assertEquals(openFiles, openFileCount());
+  }
+
   @ParameterizedTest
   @CsvSource({"10", "12", "2147483647"})
   void constructor_rejectsAHeaderWithoutElevenHashColumns(int numHashColumns, @TempDir Path folder) throws Exception {

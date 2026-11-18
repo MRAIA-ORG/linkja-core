@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Shows that HashFileWriter writes the same bytes as linkja-hashing 1.1.1 (ADR 0001). The reference file, its input
@@ -175,6 +174,20 @@ class HashFileWriterTest {
   }
 
   @Test
+  void constructor_closesTheFileWhenTheCryptoThrowsAnError(@TempDir Path folder) throws Exception {
+    FakeCrypto failingCrypto = new ReferenceCrypto() {
+      @Override
+      public RsaResult rsaEncrypt(byte[] data, byte[] key) {
+        throw new UnsatisfiedLinkError("rsaEncrypt failed");
+      }
+    };
+    long openFiles = openFileCount();
+    assertThrows(UnsatisfiedLinkError.class, () -> new HashFileWriter(folder.resolve("hashes.enc"), SITE_ID,
+      PROJECT_ID, resource("public-test.key").toFile(), failingCrypto));
+    assertEquals(openFiles, openFileCount());
+  }
+
+  @Test
   void closeAfterFailure_addsACloseErrorToTheFirstError() {
     IllegalStateException failure = new IllegalStateException("first");
     IOException closeError = new IOException("close failed");
@@ -185,11 +198,24 @@ class HashFileWriterTest {
     assertArrayEquals(new Throwable[] {closeError}, failure.getSuppressed());
   }
 
-  /** The number of files this JVM has open. Skips the test on a JVM that cannot count them (e.g. on Windows). */
+  @Test
+  void closeAfterFailure_addsAnUncheckedCloseErrorToTheFirstError() {
+    IllegalStateException failure = new IllegalStateException("first");
+    IllegalStateException closeError = new IllegalStateException("close failed");
+    Closeable stream = () -> {
+      throw closeError;
+    };
+    HashFileWriter.closeAfterFailure(stream, failure);
+    assertArrayEquals(new Throwable[] {closeError}, failure.getSuppressed());
+  }
+
+  /**
+   * The number of files this JVM has open, or -1 on a JVM that cannot count them (e.g. on Windows). There, two calls
+   * both give -1, so a test that compares them checks nothing about open files but still runs its other checks.
+   */
   static long openFileCount() {
     OperatingSystemMXBean bean = ManagementFactory.getOperatingSystemMXBean();
-    assumeTrue(bean instanceof UnixOperatingSystemMXBean, "This JVM cannot count its open files");
-    return ((UnixOperatingSystemMXBean) bean).getOpenFileDescriptorCount();
+    return bean instanceof UnixOperatingSystemMXBean unix ? unix.getOpenFileDescriptorCount() : -1;
   }
 
   @Test
