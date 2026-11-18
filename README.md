@@ -5,7 +5,7 @@ This project contains classes shared across the linkja applications. Additional 
 ## Building
 linkja-core needs Java 25 (e.g. [Eclipse Temurin](https://adoptium.net/)) and [Maven](https://maven.apache.org/).
 
-The tests call the linkja C library, so compile it first from the `develop` branch of [linkja-crypto](https://github.com/MRAIA-ORG/linkja-crypto). The public build is enough, because the tests do not call `createSecureHash`, the one function that needs the secret. It needs OpenSSL 3 and CMake (e.g. `brew install openssl@3 cmake`). From a linkja-crypto clone beside this one:
+The tests call the linkja C library, so compile it first from the `develop` branch of [linkja-crypto](https://github.com/MRAIA-ORG/linkja-crypto). It needs OpenSSL 3 and CMake (e.g. `brew install openssl@3 cmake`). From a linkja-crypto clone beside this one:
 
 ```
 mvn install -DskipTests
@@ -18,6 +18,18 @@ Then, from this folder:
 `mvn clean package -Dnative.lib.dir=../linkja-crypto/target`
 
 This compiles the code, runs all unit tests, and puts the JAR in the `target` folder, e.g. `target/linkja-core-2.0.0-SNAPSHOT.jar`. If you do not give `native.lib.dir`, the tests look for the library in the `lib` folder.
+
+With the public build, one test skips: `NativeCryptoSecretsTest`. It calls `createSecureHash`, the one function that needs the secret. To run it, compile the C library with the published test secret from [linkja-test-data](https://github.com/MRAIA-ORG/linkja-test-data). From a linkja-crypto clone, with a linkja-test-data clone beside it:
+
+```
+mvn install -DskipTests
+cp ../linkja-test-data/crypto/secret/linkja_secret.h src/include/
+cmake . -DINCLUDE_SECRETS=ON -DCMAKE_BUILD_TYPE=Release
+cmp ../linkja-test-data/crypto/secret/linkja_secret.h src/include/linkja_secret.h
+make linkjacrypto
+```
+
+`cmp` prints nothing when the test secret is in place. Keep `-DINCLUDE_SECRETS=ON` in the command. Without it, a clone that made the public build keeps `OFF` and the test still skips. Then run the same `mvn clean package` command. No test skips.
 
 CI runs the same steps on each pull request. See `.github/workflows/ci.yml`.
 
