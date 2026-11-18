@@ -18,6 +18,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * fake can match. createSecureHash is the exception: the C library mixes in a secret the fake does not have, so the
  * test shows instead that the C library reverts a fake secure hash the same way the fake does.
  * getLibrarySignature names the C library build, so the fake has nothing to match.
+ *
+ * Two tests do not compare the two. Random values cannot match, so each side is checked alone for length and
+ * format. The fake's secure hash is checked alone against sha256 of its own secret and the input.
  */
 class FakeCryptoTest {
   private final Crypto fake = new FakeCrypto();

@@ -21,6 +21,13 @@ jobs:
           ref: develop
           path: linkja-crypto
 
+      # The published test secret. It is public by design, so CI can assemble the C library with secrets.
+      - uses: actions/checkout@v7
+        with:
+          repository: MRAIA-ORG/linkja-test-data
+          path: linkja-test-data
+          persist-credentials: false
+
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -34,12 +41,19 @@ jobs:
         working-directory: linkja-crypto
         run: mvn -B install -DskipTests
 
-      # The tests never call createSecureHash, the one function that needs the secret, so the public build is enough.
-      - name: Compile the public build of the C library
+      # NativeCryptoSecretsTest calls createSecureHash, which needs a build with secrets, or the test skips.
+      # CMake writes a random secret when src/include/linkja_secret.h is not there, so check it after cmake.
+      - name: Compile the C library with the published test secret
         working-directory: linkja-crypto
         run: |
-          cmake . -DINCLUDE_SECRETS=OFF -DCMAKE_BUILD_TYPE=Release
+          secret="$GITHUB_WORKSPACE/linkja-test-data/crypto/secret/linkja_secret.h"
+          cp "$secret" src/include/
+          cmake . -DCMAKE_BUILD_TYPE=Release
+          cmp "$secret" src/include/linkja_secret.h
           make linkjacrypto
 
       - name: Test and package linkja-core
         run: mvn -B verify -Dnative.lib.dir="$GITHUB_WORKSPACE/linkja-crypto/target"
+
+      - name: Check that the secrets test ran
+        run: grep -q 'skipped="0"' target/surefire-reports/TEST-org.linkja.core.crypto.NativeCryptoSecretsTest.xml
