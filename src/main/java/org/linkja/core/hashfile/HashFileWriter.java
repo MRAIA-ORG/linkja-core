@@ -43,7 +43,12 @@ public class HashFileWriter implements Closeable {
       crypto.getLibrarySignature());
     this.stream = new BufferedOutputStream(Files.newOutputStream(path, StandardOpenOption.CREATE_NEW,
       StandardOpenOption.WRITE));
-    metadata.write(stream, aggregatorPublicKey, crypto);
+    try {
+      metadata.write(stream, aggregatorPublicKey, crypto);
+    } catch (IOException | LinkjaException | RuntimeException e) {
+      stream.close();
+      throw e;
+    }
   }
 
   /**

@@ -4,10 +4,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import com.sun.management.UnixOperatingSystemMXBean;
+import org.linkja.core.EncryptedHashFileMetadata;
+import org.linkja.core.LinkjaException;
 import org.linkja.core.crypto.FakeCrypto;
 import org.linkja.crypto.RsaResult;
 
 import java.io.File;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,13 +54,22 @@ class HashFileWriterTest {
       result.length = locked.length;
       return result;
     }
+
+    /** Undoes rsaEncrypt: takes the data out of "LOCKED(" + data + ")". */
+    @Override
+    public RsaResult rsaDecrypt(byte[] data, byte[] key) {
+      RsaResult result = new RsaResult();
+      result.data = Arrays.copyOfRange(data, "LOCKED(".length(), data.length - 1);
+      result.length = result.data.length;
+      return result;
+    }
   }
 
   private static HashRule ruleNamed(String ruleName) {
     return Arrays.stream(HashRule.values()).filter(rule -> rule.ruleName().equals(ruleName)).findFirst().orElseThrow();
   }
 
-  private static Path resource(String name) throws Exception {
+  static Path resource(String name) throws Exception {
     return Path.of(HashFileWriterTest.class.getClassLoader().getResource(name).toURI());
   }
 
@@ -101,8 +114,8 @@ class HashFileWriterTest {
     }
   }
 
-  /** Writes the given rows to a new file in folder and gives the file length. */
-  private static long writtenLength(Path folder, String name, String[]... rows) throws Exception {
+  /** Writes the given rows with ReferenceCrypto to a new file named name in folder, and gives its path. */
+  static Path writeHashFile(Path folder, String name, String[]... rows) throws Exception {
     Path output = folder.resolve(name);
     try (HashFileWriter writer = new HashFileWriter(output, SITE_ID, PROJECT_ID, resource("public-test.key").toFile(),
       new ReferenceCrypto())) {
@@ -110,7 +123,7 @@ class HashFileWriterTest {
         writer.writeRow(row);
       }
     }
-    return Files.size(output);
+    return output;
   }
 
   @ParameterizedTest
@@ -129,8 +142,22 @@ class HashFileWriterTest {
       assertTrue(error.getMessage().contains("PIDHASH"), error.getMessage());
       writer.writeRow(validRow);
     }
-    writtenLength(folder, "valid-row-only.enc", validRow);
-    assertArrayEquals(Files.readAllBytes(folder.resolve("valid-row-only.enc")), Files.readAllBytes(output));
+    assertArrayEquals(Files.readAllBytes(writeHashFile(folder, "valid-row-only.enc", validRow)),
+      Files.readAllBytes(output));
+  }
+
+  @Test
+  void constructor_closesTheFileWhenItFails(@TempDir Path folder) throws Exception {
+    String longSiteId = "1".repeat(EncryptedHashFileMetadata.INPUT_BUFFER_LENGTH + 1);
+    long openFiles = openFileCount();
+    assertThrows(LinkjaException.class, () -> new HashFileWriter(folder.resolve("hashes.enc"), longSiteId, PROJECT_ID,
+      resource("public-test.key").toFile(), new ReferenceCrypto()));
+    assertEquals(openFiles, openFileCount());
+  }
+
+  /** The number of files this JVM has open. */
+  static long openFileCount() {
+    return ((UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean()).getOpenFileDescriptorCount();
   }
 
   @Test
@@ -143,7 +170,7 @@ class HashFileWriterTest {
       writer.writeRow(row);
     }
     byte[] bytes = Files.readAllBytes(output);
-    int rowStart = (int) writtenLength(folder, "no-rows.enc");
+    int rowStart = (int) Files.size(writeHashFile(folder, "no-rows.enc"));
     int hashLength = 64;
     assertEquals(rowStart + HashRule.values().length * hashLength, bytes.length);
     byte[] afterPidhash = Arrays.copyOfRange(bytes, rowStart + hashLength, bytes.length);
