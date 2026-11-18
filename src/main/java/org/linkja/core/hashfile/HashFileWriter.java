@@ -25,7 +25,7 @@ import java.nio.file.StandardOpenOption;
 public class HashFileWriter implements Closeable {
   public static final int SESSION_KEY_LENGTH = 32;
   // The C library gives a SHA-256 secure hash as 64 hex characters. An empty hash value is 64 zero bytes.
-  private static final int HASH_VALUE_LENGTH = 64;
+  static final int HASH_VALUE_LENGTH = 64;
 
   private final Path path;
   private final Crypto crypto;
@@ -45,8 +45,8 @@ public class HashFileWriter implements Closeable {
       StandardOpenOption.WRITE));
     try {
       metadata.write(stream, aggregatorPublicKey, crypto);
-    } catch (IOException | LinkjaException | RuntimeException e) {
-      stream.close();
+    } catch (Throwable e) {
+      closeAfterFailure(stream, e);
       throw e;
     }
   }
@@ -75,6 +75,15 @@ public class HashFileWriter implements Closeable {
         String secureHash = crypto.createSecureHash(value, sessionKey, rowId, rule.tokenId()).toUpperCase();
         stream.write(secureHash.getBytes(StandardCharsets.US_ASCII));
       }
+    }
+  }
+
+  /** Closes stream after failure, the error that stops a constructor. An error from close is added to failure. */
+  static void closeAfterFailure(Closeable stream, Throwable failure) {
+    try {
+      stream.close();
+    } catch (Throwable closeError) {
+      failure.addSuppressed(closeError);
     }
   }
 

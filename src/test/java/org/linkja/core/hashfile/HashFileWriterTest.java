@@ -10,8 +10,11 @@ import org.linkja.core.LinkjaException;
 import org.linkja.core.crypto.FakeCrypto;
 import org.linkja.crypto.RsaResult;
 
+import java.io.Closeable;
 import java.io.File;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Shows that HashFileWriter writes the same bytes as linkja-hashing 1.1.1 (ADR 0001). The reference file, its input
@@ -155,9 +159,37 @@ class HashFileWriterTest {
     assertEquals(openFiles, openFileCount());
   }
 
-  /** The number of files this JVM has open. */
+  @Test
+  void constructor_closesTheFileWhenTheCryptoThrowsAnUncheckedError(@TempDir Path folder) throws Exception {
+    FakeCrypto failingCrypto = new ReferenceCrypto() {
+      @Override
+      public RsaResult rsaEncrypt(byte[] data, byte[] key) {
+        throw new IllegalStateException("rsaEncrypt failed");
+      }
+    };
+    long openFiles = openFileCount();
+    IllegalStateException error = assertThrows(IllegalStateException.class, () -> new HashFileWriter(
+      folder.resolve("hashes.enc"), SITE_ID, PROJECT_ID, resource("public-test.key").toFile(), failingCrypto));
+    assertEquals("rsaEncrypt failed", error.getMessage());
+    assertEquals(openFiles, openFileCount());
+  }
+
+  @Test
+  void closeAfterFailure_addsACloseErrorToTheFirstError() {
+    IllegalStateException failure = new IllegalStateException("first");
+    IOException closeError = new IOException("close failed");
+    Closeable stream = () -> {
+      throw closeError;
+    };
+    HashFileWriter.closeAfterFailure(stream, failure);
+    assertArrayEquals(new Throwable[] {closeError}, failure.getSuppressed());
+  }
+
+  /** The number of files this JVM has open. Skips the test on a JVM that cannot count them (e.g. on Windows). */
   static long openFileCount() {
-    return ((UnixOperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean()).getOpenFileDescriptorCount();
+    OperatingSystemMXBean bean = ManagementFactory.getOperatingSystemMXBean();
+    assumeTrue(bean instanceof UnixOperatingSystemMXBean, "This JVM cannot count its open files");
+    return ((UnixOperatingSystemMXBean) bean).getOpenFileDescriptorCount();
   }
 
   @Test

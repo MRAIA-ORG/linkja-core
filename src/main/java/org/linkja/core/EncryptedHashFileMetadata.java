@@ -129,7 +129,8 @@ public class EncryptedHashFileMetadata {
   }
 
   /** Reads the header and envelope. The envelope is unlocked with crypto.rsaDecrypt. */
-  public static EncryptedHashFileMetadata read(BufferedInputStream stream, File rsaPrivateKey, Crypto crypto) throws IOException, LinkjaException {
+  public static EncryptedHashFileMetadata read(BufferedInputStream stream, File rsaPrivateKey, Crypto crypto)
+    throws IOException, LinkjaException {
     EncryptedHashFileMetadata metadata = new EncryptedHashFileMetadata();
     readBlockNameFromStream(stream, "metadata start", METADATA_START_BLOCK);
 
@@ -183,7 +184,8 @@ public class EncryptedHashFileMetadata {
 
     byte[] rsaPrivateKeyBytes = Files.readAllBytes(rsaPrivateKey.toPath());
     byte[] sessionKey = readAndDecryptFromStream(stream, rsaPrivateKeyBytes, "session key", sessionKeySize, crypto);
-    String cryptoSignature = new String(readAndDecryptFromStream(stream, rsaPrivateKeyBytes, "crypto signature", cryptoSignatureSize, crypto));
+    String cryptoSignature = new String(readAndDecryptFromStream(stream, rsaPrivateKeyBytes, "crypto signature",
+      cryptoSignatureSize, crypto));
 
     metadata.setSessionKey(sessionKey);
     metadata.setCryptoSignature(cryptoSignature);
@@ -203,7 +205,8 @@ public class EncryptedHashFileMetadata {
     readBlockDelimiter(stream, String.format("%s block in header", blockName));
   }
 
-  private static byte[] readAndDecryptFromStream(BufferedInputStream stream, byte[] rsaPrivateKey, String dataElementName, int expectedLength, Crypto crypto) throws LinkjaException, IOException {
+  private static byte[] readAndDecryptFromStream(BufferedInputStream stream, byte[] rsaPrivateKey,
+    String dataElementName, int expectedLength, Crypto crypto) throws LinkjaException, IOException {
     byte[] data = readByteArrayFromStream(stream, dataElementName);
     RsaResult decryptResult = crypto.rsaDecrypt(data, rsaPrivateKey);
     if (decryptResult.length != expectedLength) {
