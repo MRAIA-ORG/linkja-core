@@ -16,14 +16,11 @@ import java.nio.file.Path;
  * Reads a v1 hash file, as HashFileWriter and linkja-hashing 1.1.1 write it (ADR 0001).
  *
  * The constructor reads the header and the envelope, and unlocks the session key with the RSA private key. A bad or
- * truncated header throws LinkjaException with a message that names the part that is wrong. readRow gives the values
- * of one row, in the order of the header's hash columns (HashRule order for a v1 file): each secure hash with the
- * session key, row ID and token ID taken out again, in upper case, and "" for an empty value (64 zero bytes).
+ * truncated header, or one without 11 hash columns, throws LinkjaException with a message that names the part that is
+ * wrong. readRow gives the values of one row, in HashRule order: each secure hash with the session key, row ID and
+ * token ID taken out again, in upper case, and "" for an empty value (64 zero bytes).
  */
 public class HashFileReader implements Closeable {
-  // The C library gives a SHA-256 secure hash as 64 hex characters. An empty hash value is 64 zero bytes.
-  private static final int HASH_VALUE_LENGTH = 64;
-
   private final Crypto crypto;
   private final BufferedInputStream stream;
   private final EncryptedHashFileMetadata metadata;
@@ -34,8 +31,12 @@ public class HashFileReader implements Closeable {
     this.stream = new BufferedInputStream(Files.newInputStream(path));
     try {
       this.metadata = EncryptedHashFileMetadata.read(stream, rsaPrivateKey, crypto);
-    } catch (IOException | LinkjaException | RuntimeException e) {
-      stream.close();
+      if (metadata.getNumHashColumns() != HashRule.values().length) {
+        throw new LinkjaException(String.format("A v1 hash file has %d hash columns, but its header says %d",
+          HashRule.values().length, metadata.getNumHashColumns()));
+      }
+    } catch (Throwable e) {
+      HashFileWriter.closeAfterFailure(stream, e);
       throw e;
     }
   }
@@ -60,8 +61,8 @@ public class HashFileReader implements Closeable {
     String rowId = Long.toString(numRows);
     String[] values = new String[metadata.getNumHashColumns()];
     for (int column = 0; column < values.length; column++) {
-      byte[] data = stream.readNBytes(HASH_VALUE_LENGTH);
-      if (data.length != HASH_VALUE_LENGTH) {
+      byte[] data = stream.readNBytes(HashFileWriter.HASH_VALUE_LENGTH);
+      if (data.length != HashFileWriter.HASH_VALUE_LENGTH) {
         throw new LinkjaException(String.format("The hash file ends in row %d, but its header says it has %d rows",
           numRows, metadata.getNumHashRows()));
       }

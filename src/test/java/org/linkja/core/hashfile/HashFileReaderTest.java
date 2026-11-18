@@ -8,7 +8,9 @@ import org.linkja.core.EncryptedHashFileMetadata;
 import org.linkja.core.LinkjaException;
 import org.linkja.core.crypto.Crypto;
 import org.linkja.core.crypto.FakeCrypto;
+import org.linkja.crypto.RsaResult;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -133,6 +135,39 @@ class HashFileReaderTest {
     Path empty = Files.createFile(folder.resolve("empty.enc"));
     long openFiles = openFileCount();
     assertThrows(LinkjaException.class, () -> new HashFileReader(empty, privateKey(), new ReferenceCrypto()));
+    assertEquals(openFiles, openFileCount());
+  }
+
+  @Test
+  void constructor_closesTheFileWhenTheCryptoThrowsAnUncheckedError(@TempDir Path folder) throws Exception {
+    Path file = writeHashFile(folder, "hashes.enc", row("A"));
+    Crypto failingCrypto = new ReferenceCrypto() {
+      @Override
+      public RsaResult rsaDecrypt(byte[] data, byte[] key) {
+        throw new IllegalStateException("rsaDecrypt failed");
+      }
+    };
+    long openFiles = openFileCount();
+    IllegalStateException error = assertThrows(IllegalStateException.class,
+      () -> new HashFileReader(file, privateKey(), failingCrypto));
+    assertEquals("rsaDecrypt failed", error.getMessage());
+    assertEquals(openFiles, openFileCount());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"10", "12", "2147483647"})
+  void constructor_rejectsAHeaderWithoutElevenHashColumns(int numHashColumns, @TempDir Path folder) throws Exception {
+    Path file = folder.resolve("hashes.enc");
+    EncryptedHashFileMetadata metadata = new EncryptedHashFileMetadata("1", "Linkja Project", numHashColumns, 0,
+      new byte[HashFileWriter.SESSION_KEY_LENGTH], "signature");
+    try (BufferedOutputStream stream = new BufferedOutputStream(Files.newOutputStream(file))) {
+      metadata.write(stream, resource("public-test.key").toFile(), new ReferenceCrypto());
+    }
+    long openFiles = openFileCount();
+    LinkjaException error = assertThrows(LinkjaException.class,
+      () -> new HashFileReader(file, privateKey(), new ReferenceCrypto()));
+    assertEquals(String.format("A v1 hash file has 11 hash columns, but its header says %d", numHashColumns),
+      error.getMessage());
     assertEquals(openFiles, openFileCount());
   }
 
