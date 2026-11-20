@@ -31,7 +31,7 @@ make linkjacrypto
 
 `cmp` prints nothing when the test secret is in place. Keep `-DINCLUDE_SECRETS=ON` in the command. Without it, a clone that made the public build keeps `OFF` and the test still skips. Then run the same `mvn clean package` command. No test skips.
 
-CI runs the same steps on each pull request. See `.github/workflows/ci.yml`.
+CI runs mvn verify, relies on CMake default, and never runs the public build. See `.github/workflows/ci.yml`.
 
 
 ## Deploying to Maven Repository
